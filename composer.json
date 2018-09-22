@@ -1,0 +1,28 @@
+{
+    "name": "irfantoor/datastore",
+    "description": "Data Storage of entities into Filesystem",
+    "keywords": "Data, key value Storage, Filesystem",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Irfan TOOR",
+            "email": "email@irfantoor.com"
+        }
+    ],
+    "require": {
+        "league/flysystem": "^1.0",
+        "irfantoor/database": "^0.1.3"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^7.3"
+    },
+    "autoload": {
+        "classmap": [
+            "src/"
+        ],
+        "psr-4": {
+            "IrfanTOOR\\": "src"
+        }
+    }
+}
