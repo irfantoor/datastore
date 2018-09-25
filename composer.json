@@ -1,7 +1,9 @@
 {
     "name": "irfantoor/datastore",
     "description": "Data Storage of entities into Filesystem",
-    "keywords": "Data, key value Storage, Filesystem",
+    "keywords": [ 
+	"Data", "key value Storage", "Filesystem"
+    ],
     "type": "library",
     "license": "MIT",
     "authors": [
