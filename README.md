@@ -19,6 +19,10 @@ Verify if the store has an entity with the requested id. returns true or false
 
 ```php
 $ds = new IrfanTOOR\Datastore('/yourpath/to/datatore/');
+
+if ($ds->has('hello')) {
+	echo $ds->getContents('hello');
+}
 ```
 
 ## setContents($id, $contents)
@@ -27,6 +31,7 @@ sets the contents of an id:
 ```php
 $ds->setContents('hello', 'Hello');
 $ds->setContents('hello-world', 'Hello World!');
+
 # ...
 ```
 
