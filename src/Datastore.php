@@ -21,7 +21,7 @@ class Datastore
 	 *
 	 * @param string $path
 	 */
-	function __construct($path = "/tmp/storage/ds/", $adapter = null)
+	function __construct($path, $adapter = null)
 	{
 		# memory based cache of hashes
 		$this->cache = [];

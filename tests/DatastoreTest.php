@@ -1,9 +1,9 @@
 <?php
 
 use IrfanTOOR\Datastore;
-use PHPUnit\Framework\TestCase;
+use IrfanTOOR\Test;
 
-class DatastoreTest extends TestCase
+class DatastoreTest extends Test
 {
     protected $samples = [
         # $id = md5($string)
