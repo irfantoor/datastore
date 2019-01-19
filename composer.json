@@ -13,8 +13,8 @@
         }
     ],
     "require": {
-        "league/flysystem": "^1.0",
-        "irfantoor/database": "^0.1.3"
+        "irfantoor/database": "^0.2",
+        "league/flysystem": "^1.0"
     },
     "require-dev": {
         "irfantoor/test": "dev-master"
