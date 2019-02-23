@@ -98,12 +98,12 @@ class DatastoreTest extends Test
 
         $ds->setContents('hello-world', 'Information');
         $r = $ds->getInfo('hello-world');
-        $this->assertNotNull($r);
-        $this->assertTrue(isset($r['id']));
-        $this->assertTrue(isset($r['path']));
-        $this->assertTrue(isset($r['size']));
-        $this->assertTrue(isset($r['created_on']));
-        $this->assertTrue(isset($r['updated_on']));
+        $this->assertArray($r);
+        $this->assertEquals('hello-world', $r['id']);
+        $this->assertEquals($this->samples['hello-world'], $r['path']);
+        $this->assertEquals(11, $r['size']);
+        $this->assertTrue(array_key_exists('created_on', $r));
+        $this->assertTrue(array_key_exists('updated_on', $r));
     }
 
     public function testRemoveTheTemporaryDatastore()

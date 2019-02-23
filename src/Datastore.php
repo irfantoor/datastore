@@ -72,8 +72,8 @@ class Datastore
 		
 		$this->cache[$id] = $path;
 		
-		if (count($cache) > 10) {
-			shift($cache);
+		if (count($this->cache) > 10) {
+			shift($this->cache);
 		}
 		
 		return $path;

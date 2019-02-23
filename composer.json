@@ -1,6 +1,6 @@
 {
     "name": "irfantoor/datastore",
-    "description": "Data Storage of entities into Filesystem",
+    "description": "Data Store of key, value pairs",
     "keywords": [ 
 	"Data", "key value Storage", "Filesystem"
     ],
