@@ -1,6 +1,6 @@
 # Datastore 
 
-Storage of an entity [id => contents] to a filesystem
+Storage of an key, value pair to a filesystem
 
 # Quick Start
 
@@ -14,7 +14,7 @@ Creating the Datastore:
 $ds = new IrfanTOOR\Datastore('/yourpath/to/datatore/');
 ```
 
-## has($id)
+## hasKey($id)
 Verify if the store has an entity with the requested id. returns true or false
 
 ```php
@@ -31,8 +31,15 @@ sets the contents of an id:
 ```php
 $ds->setContents('hello', 'Hello');
 $ds->setContents('hello-world', 'Hello World!');
-
 # ...
+```
+
+## getInfo($id)
+You can use the function `getInfo` to retrive the information of an entity:
+
+```php
+$info = $ds->getInfo('hello-world');
+print_r($info);
 ```
 
 This function returns the information array of the entity as well.
@@ -46,18 +53,36 @@ echo $contents;
 echo $ds->getContents('hello-world');
 ```
 
-## delete($id)
-deletes an entity assosiated to the provided id:
+## setComposite($r)
+sets the contents and other information related to an entity passed as array. Note a special  field
+meta is added to add the meta tags related to stored entry.
 
 ```php
-$ds->delete('hello');
+$r = [
+    'key' => 'hello',
+    'contents' => 'Hello World!',
+    'meta' => [
+        'keywords' => 'hello, world',
+    ],
+    'created_on' => '2019-03-18 16:13:00',
+];
+$ds->setComponents($r);
+# ...
 ```
 
-## getInfo($id)
-You can use the function `getInfo` to retrive the information of an entity:
+## getComposite($id)
+returns the information related to a key and its contents as array:
 
 ```php
-$info = $ds->getInfo('hello-world');
-print_r($info);
+$r = $ds->getComposite('hello');
+echo $r['contents'];
 ```
+
+## removeContents($id)
+removes an entity assosiated to the provided id:
+
+```php
+$ds->remove('hello');
+```
+
 

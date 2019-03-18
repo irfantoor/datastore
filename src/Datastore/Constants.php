@@ -25,5 +25,5 @@ class Constants
 {
     public const NAME        = 'Irfan\'s Datastore';
     public const DESCRIPTION = 'Data Store of key, value pairs';
-    public const VERSION     = '0.3.0';
+    public const VERSION     = '0.3.1';
 }
