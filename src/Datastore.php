@@ -3,177 +3,236 @@
 namespace IrfanTOOR;
 
 use Exception;
-use IrfanTOOR\Datastore\DatastoreIndex;
+use IrfanTOOR\Datastore\Constants;
+use IrfanTOOR\Database\Model;
 use League\Flysystem\Filesystem;
 use League\Flysystem\Adapter\Local;
 
-/**
- * Datastore -- A filesystem based datastore
- */
-class Datastore
-{	
-	protected $db;
-	protected $cache;
-	protected $fs;
+class Datastore extends Model
+{
+    protected $fs;
 
-	/**
-	 * constructs the datastore
-	 *
-	 * @param string $path
-	 */
-	function __construct($path, $adapter = null)
-	{
-		# memory based cache of hashes
-		$this->cache = [];
-		
-		# adapter 
-		if (!$adapter)
-        	$adapter  = new Local($path, LOCK_EX, Local::SKIP_LINKS);
+    function __construct($connection = [])
+    {
+        $this->schema = [
+            'id INTEGER PRIMARY KEY',
+            'key VARCHAR(200)',
+            'hash VARCHAR(32)',
+            'meta',
+            'size INTEGER DEFAULT 0',
+            'created_on DATETIME DEFAULT CURRENT_TIMESTAMP',
+            'updated_on INTEGER'
+        ];
 
-        # filesystem
+        $this->indecies = [
+            ['index' => 'key'],
+            ['unique' => 'hash'],
+            ['index' => 'created_on'],
+        ];
+
+        if (isset($connection['file'])) {
+            if (!isset($connection['adapter'])) {
+                $connection['path'] = filepath($connection['file']);
+            }
+        }
+
+        if (isset($connection['path'])) {
+            if (!is_dir($connection['path'])) {
+                throw new Exception("path must be a directory", 1);
+            }
+
+            if (!isset($connection['file'])) {
+                $connection['file'] = $connection['path'] . '.datastore.sqlite';
+            }
+
+            $adapter  = new Local($connection['path'], LOCK_EX, Local::SKIP_LINKS);
+        }
+
+        if (isset($connection['adapter'])) {
+            $adapter  = $connection['adapter'];
+        }
+
         $this->fs = new Filesystem($adapter);
 
-		$sqlite = '.datastore.sqlite';
-		if ($this->fs->has($sqlite)) {
-			$this->db = new DatastoreIndex(['file' => $path . $sqlite]);
-		} else {
-			$this->fs->put($sqlite, '');
-			$this->db = new DatastoreIndex(['file' => $path . $sqlite]);
-			$this->db->create();
-		}
-	}
-	
-	/**
-     * getPath - returns the relative path of stored entity
-     *
-     * @param string $id
-     */
-	public function getPath($id)
-	{
-		# repetitive cache
-		if (isset($this->cache[$id]))
-			return $this->cache[$id];
+        if (!isset($connection['table'])) {
+            $connection['table'] = 'datastoreindex';
+        }
 
-		$r = $this->db->getFirst(
-			['where' => 'id = :id'],
-			['id' => $id]
-		);
-		
-		if ($r) {
-			$path = $r['path'];
-		} else {
-			$h = md5($id);
-			$path = 
-				$h[0] . $h[1] . '/' .
-				$h[2] . $h[3] . '/' .
-				$h[4] . $h[5] . '/' .
-				$h;
-		}
-		
-		$this->cache[$id] = $path;
-		
-		if (count($this->cache) > 10) {
-			shift($this->cache);
-		}
-		
-		return $path;
-	}
-	
-	/**
-	 * has - verifies the datastore has an entity with the given id
-	 *
-	 * @param string #id
-	 *
-	 * @return boolean true | false
-	 */
-	function has($id)
-	{
-		return $this->getInfo($id) ? true : false;
-	}
+        if (!is_file($connection['file'])) {
+            file_put_contents($connection['file'], '');
+            parent::__construct($connection);
+            $this->create();
+        } else {
+            parent::__construct($connection);
+        }
+    }
 
-	/**
-	 * getInfo - returns the information associated to an entity
-	 *
-	 * @param string $id
-	 *
-	 * @return array
-	 */
-	function getInfo($id)
-	{
-		$r = $this->db->getFirst(
-			['where' => 'id=:id'],
-			['id' => $id]
-		);
+    function hash($key)
+    {
+        return md5($key);
+    }
 
-		return $r ?: null;
-	}	
-	
-	/**
-	 * getContents - returns the contents associated to an id
-	 *
-	 * @param string $id
-	 *
-	 * @return string
-	 */
-	function getContents($id)
-	{
-		$r = $this->getInfo($id);
-		if ($r) {
-			return $this->fs->read($r['path']);
-		} else {
-			return '';
-		}
-	}
-	
-	/**
-	 * setContents - sets the contents associated to an id, and returns the associated info
-	 *
-	 * @param string $id
-	 * @param string $contents
-	 *
-	 * @return mixed array | false
-	 */
-	function setContents($id, $contents = '')
-	{
-		if (!is_string($contents)) {
-			throw new Exception('contents must be a string');
-		}
+    function hashToPath($h)
+    {
+        return
+            $h[0] . $h[1] . '/' .
+            $h[2] . $h[3] . '/' .
+            $h[4] . $h[5] . '/' .
+            $h;
+    }
 
-		$r = $this->getInfo($id);
-		$path =  $r ? $r['path'] : $this->getPath($id);
+    function getPath($key)
+    {
+        $h = $this->hash($key);
+        return $this->hashToPath($h);
+    }
 
-		if ($this->fs->put($path, $contents)) {
-			$u['id'] = $id;
-			$u['path']   = $path;
-			$u['size'] = strlen($contents);
-			$u['updated_on'] = time();
+    function hasHash($hash)
+    {
+        return $this->db->has(
+            ['where' => 'hash=:hash'],
+            ['hash' => $hash]
+        );
+    }
 
-			$this->db->insertOrUpdate($u);
-			return $this->getInfo($id);
-		} else {
-			return false;
-		}
-	}
+    function getVersion()
+    {
+        return Constants::VERSION;
+    }
 
-	/**
-	 * delete - deletes the contents associated to an id and the entity
-	 *
-	 * @param string $id
-	 *
-	 * @return bool true | false
-	 */
-	function delete($id)
-	{
-		$r = $this->getInfo($id);
-		if (isset($r['path'])) {
-			$this->db->remove(
-				['where' => 'path=:path'],
-				['path' => $r['path']]
-			);
-			
-			return $this->fs->delete($r['path']);
-		} else {
-			return false;
-		}
-	}
+    function hasKey($key)
+    {
+        return $this->has(
+            ['where' => 'key=:key'],
+            ['key' => $key]
+        );
+    }
+
+    function setContents($key, $contents)
+    {
+        if (!is_string($contents)) {
+            throw new Exception("value must be a string", 1);
+        }
+
+        return $this->setComposite([
+            'key' => $key,
+            'contents' => $contents
+        ]);
+    }
+
+    function setComposite(Array $c) {
+        if (!isset($c['key'])) {
+            throw new Exception("key not provided", 1);
+        }
+
+        if (!isset($c['contents'])) {
+            throw new Exception("contents not provided", 1);
+        }
+
+        $hash = $this->hash($c['key']);
+        $path = $this->hashToPath($hash);
+
+        if ($this->fs->put($path, $c['contents'])) {
+            $r = [
+                'key' => $c['key'],
+                'hash' => $hash,
+                'meta' => isset($c['meta']) ? json_encode($c['meta']) : '',
+                'size'  => strlen($c['contents']),
+                'updated_on' => isset($c['updated_on']) ? $c['updated_on'] : time(),
+
+            ];
+
+            if (isset($c['created_on'])) {
+                $r['created_on'] = $c['created_on'];
+            }
+
+            return $this->insertOrUpdate($r);
+        }
+
+        return false;
+    }
+
+    function getInfo($key)
+    {
+        $r = $this->getFirst(
+            ['where' => 'key=:key'],
+            ['key' => $key]
+        );
+
+        if (isset($r['meta'])) {
+            $r['meta'] = json_decode($r['meta'], 1);
+        }
+
+        return $r ?: null;
+    }
+
+    function getContents($key)
+    {
+        $r = $this->getInfo($key);
+
+        if ($r) {
+            return $this->fs->read($this->hashToPath($r['hash']));
+        }
+
+        return null;
+    }
+
+    function getComposit($key)
+    {
+        $c = $this->getInfo($key);
+
+        if ($c) {
+            $c['contents'] = $this->fs->read($this->hashToPath($c['hash']));
+        }
+
+        return $c;
+    }
+
+    function removeContents($key)
+    {
+        $r = $this->getInfo($key);
+
+        if ($r) {
+            $path = $this->hashToPath($r['hash']);
+            $removed = $this->remove(
+                ['where' => 'key = :key'],
+                ['key' => $key]
+            );
+            if ($removed) {
+                $this->fs->delete($path);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function addFile($key, $file, $meta = [])
+    {
+        if (!is_file($file)) {
+            throw new Exception("file: $file, does not exist", 1);
+        }
+
+        $path = dirname($file);
+        $filename = str_replace($path, '', $file);
+        $ds = $filename[0];
+        $path = $path . $ds;
+        $filename = str_replace($ds, '', $filename);
+        $meta = array_merge(
+            [
+                'file' => $file,
+                'filename' => $filename,
+                'mime'     => mime_content_type($file),
+            ],
+            $meta
+        );
+
+        return $this->setComposite([
+            'key' => $key,
+            'meta' => $meta,
+            'created_on' => date('Y-m-d H:i:s', filectime($file)),
+            'updated_on' => filemtime($file),
+            'contents' => file_get_contents($file),
+        ]);
+    }
 }
