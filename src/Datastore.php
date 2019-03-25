@@ -31,7 +31,7 @@ class Datastore extends Model
         ];
 
         if (isset($connection['file'])) {
-            if (!isset($connection['adapter'])) {
+            if (!isset($connection['adapter']) && !isset($connection['path'])) {
                 $connection['path'] = filepath($connection['file']);
             }
         }
@@ -46,10 +46,10 @@ class Datastore extends Model
             }
 
             $adapter  = new Local($connection['path'], LOCK_EX, Local::SKIP_LINKS);
-        }
-
-        if (isset($connection['adapter'])) {
+        } elseif (isset($connection['adapter'])) {
             $adapter  = $connection['adapter'];
+        } else {
+            throw new Exception("path or adapter must be a directory", 1);
         }
 
         $this->fs = new Filesystem($adapter);
