@@ -8,6 +8,8 @@ use IrfanTOOR\Test;
 
 class DatastoreTest extends Test
 {
+    protected $ds;
+
     protected $samples = [
         # $id = md5($string)
         # $id[0] . $id[1] . '/' . $id[2] . $id[3] . '/' . $id[4] . $id[5] . '/' . {$id}
@@ -15,24 +17,31 @@ class DatastoreTest extends Test
         'hello-world' => '20/95/31/2095312189753de6ad47dfe20cbe97ec'
     ];
 
-    function getDatastore($path = __DIR__ . '/ds/', $adapter = null)
+    function getDatastore($path = null, $adapter = null)
     {
-        return new Datastore([
-            'path' => $path,
-            'adapter' => $adapter
-        ]);
+        if ($path) {
+            return new Datastore(['path' => $path]);
+        }
+
+        if (!$this->ds) {
+            $path = __DIR__ . '/ds';
+
+            if (!is_dir($path)) {
+                mkdir ($path);
+            }
+
+            $this->ds = new Datastore(['path' => $path]);
+        }
+
+        return $this->ds;
     }
 
     function testDatastoreInstance()
     {
         # if dir does not exists
         $this->assertException(function(){
-            $this->getDatastore();
+            $this->getDatastore(__DIR__ . 'abc/def/ghi');
         });
-
-        # create the directory
-        system('mkdir ' . __DIR__ . '/ds', $result);
-        $this->assertEquals(0, $result);
 
         $ds = $this->getDatastore();
         $this->assertInstanceOf(IrfanTOOR\Datastore::class, $ds);
@@ -49,7 +58,7 @@ class DatastoreTest extends Test
 
         $this->assertString($version);
         $this->assertFalse(strpos($version, 'VERSION'));
-        $this->assertEquals(Constants::VERSION, $version);
+        $this->assertEquals($ds::VERSION, $version);
     }
 
     function testGetPath()

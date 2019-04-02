@@ -5,13 +5,29 @@ namespace IrfanTOOR;
 use Exception;
 use IrfanTOOR\Datastore\Constants;
 use IrfanTOOR\Database\Model;
-use League\Flysystem\Filesystem;
-use League\Flysystem\Adapter\Local;
+use IrfanTOOR\Filesystem;
 
 class Datastore extends Model
 {
+    /**
+     * Version
+     *
+     * @var const
+     */
+    public const VERSION = "0.3.4";
+
+    /**
+     * Filesystem Object
+     *
+     * @var Filesystem
+     */
     protected $fs;
 
+    /**
+     * Constructs the Datastore
+     *
+     * @param array
+     */    
     function __construct($connection = [])
     {
         $this->schema = [
@@ -31,8 +47,8 @@ class Datastore extends Model
         ];
 
         if (isset($connection['file'])) {
-            if (!isset($connection['adapter']) && !isset($connection['path'])) {
-                $connection['path'] = filepath($connection['file']);
+            if (!isset($connection['path'])) {
+                $connection['path'] = filepath($connection['file']) . '/';
             }
         }
 
@@ -42,17 +58,11 @@ class Datastore extends Model
             }
 
             if (!isset($connection['file'])) {
-                $connection['file'] = $connection['path'] . '.datastore.sqlite';
+                $connection['file'] = rtrim($connection['path'], '/') . '/.datastore.sqlite';
             }
-
-            $adapter  = new Local($connection['path'], LOCK_EX, Local::SKIP_LINKS);
-        } elseif (isset($connection['adapter'])) {
-            $adapter  = $connection['adapter'];
-        } else {
-            throw new Exception("path or adapter must be a directory", 1);
         }
 
-        $this->fs = new Filesystem($adapter);
+        $this->fs = new Filesystem($connection['path']);
 
         if (!isset($connection['table'])) {
             $connection['table'] = 'datastoreindex';
@@ -97,7 +107,7 @@ class Datastore extends Model
 
     function getVersion()
     {
-        return Constants::VERSION;
+        return self::VERSION;
     }
 
     function hasKey($key)
@@ -131,15 +141,19 @@ class Datastore extends Model
 
         $hash = $this->hash($c['key']);
         $path = $this->hashToPath($hash);
+        $dir = dirname($path);
 
-        if ($this->fs->put($path, $c['contents'])) {
+        if (!$this->fs->hasDir($dir)) {
+            $this->fs->createDir($dir, true);
+        }
+
+        if ($this->fs->write($path, $c['contents'], true)) {
             $r = [
                 'key' => $c['key'],
                 'hash' => $hash,
                 'meta' => isset($c['meta']) ? json_encode($c['meta']) : '',
                 'size'  => strlen($c['contents']),
                 'updated_on' => isset($c['updated_on']) ? $c['updated_on'] : time(),
-
             ];
 
             if (isset($c['created_on'])) {
@@ -199,7 +213,7 @@ class Datastore extends Model
                 ['key' => $key]
             );
             if ($removed) {
-                $this->fs->delete($path);
+                $this->fs->remove($path);
                 return true;
             }
         }

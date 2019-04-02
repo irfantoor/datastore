@@ -14,7 +14,7 @@
     ],
     "require": {
         "irfantoor/database": "^0.2",
-        "league/flysystem": "^1.0"
+        "irfantoor/filesystem": "^0.1.0"
     },
     "require-dev": {
         "irfantoor/test": "^0.4.3"
