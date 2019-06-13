@@ -14,7 +14,7 @@ class Datastore extends Model
      *
      * @var const
      */
-    public const VERSION = "0.3.4";
+    public const VERSION = "0.3.5";
 
     /**
      * Filesystem Object
