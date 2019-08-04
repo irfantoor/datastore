@@ -3,9 +3,11 @@
 namespace IrfanTOOR;
 
 use Exception;
-use IrfanTOOR\Datastore\Constants;
-use IrfanTOOR\Database\Model;
-use IrfanTOOR\Filesystem;
+use IrfanTOOR\{
+	Datastore\Constants,
+	Database\Model,
+	Filesystem
+};
 
 class Datastore extends Model
 {
@@ -14,7 +16,7 @@ class Datastore extends Model
      *
      * @var const
      */
-    public const VERSION = "0.3.5";
+    public const VERSION = "0.3.6";
 
     /**
      * Filesystem Object
