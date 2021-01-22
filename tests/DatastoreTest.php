@@ -2,8 +2,7 @@
 
 use IrfanTOOR\Database;
 use IrfanTOOR\Datastore;
-use IrfanTOOR\Datastore\Constants;
-use IrfanTOOR\Datastore\DatastoreIndex;
+use IrfanTOOR\Datastore\Model;
 use IrfanTOOR\Test;
 
 class DatastoreTest extends Test
@@ -17,45 +16,49 @@ class DatastoreTest extends Test
         'hello-world' => '20/95/31/2095312189753de6ad47dfe20cbe97ec'
     ];
 
-    function getDatastore($path = null, $adapter = null)
+    function __construct()
     {
-        if ($path) {
-            return new Datastore(['path' => $path]);
-        }
+        $path = $this->getPath();
 
-        if (!$this->ds) {
-            $path = __DIR__ . '/ds';
+        if (is_file($path . "/ds.idx"))
+            unlink($path . "/ds.idx");
 
-            if (!is_dir($path)) {
-                mkdir ($path);
-            }
+        if (!is_dir($path))
+            mkdir ($path);
+    }
 
-            $this->ds = new Datastore(['path' => $path]);
-        }
+    function getPath()
+    {
+        return __DIR__ . '/ds';
+    }
 
-        return $this->ds;
+    function getDatastore($path = null)
+    {
+        if (!$path)
+            $path = $this->getPath();
+
+        return new Datastore($path);
     }
 
     function testDatastoreInstance()
     {
-        # if dir does not exists
-        $this->assertException(function(){
-            $this->getDatastore(__DIR__ . 'abc/def/ghi');
-        });
-
         $ds = $this->getDatastore();
         $this->assertInstanceOf(IrfanTOOR\Datastore::class, $ds);
-        $this->assertInstanceOf(IrfanTOOR\Database\Model::class, $ds);
+    }
+
+    /**
+     * throws: Exception::class
+     * message: path must be a directory
+     */
+    function testDatastorePathException()
+    {
+        $this->getDatastore(__DIR__ . 'abc/def/ghi');
     }
 
     function testGetVersion()
     {
         $ds = $this->getDatastore();
-        $version = $ds->getVersion();
-
-        $c = new \IrfanTOOR\Console();
-        $c->write('(' . $version . ') ', 'dark');
-
+        $version = Datastore::VERSION;
         $this->assertString($version);
         $this->assertFalse(strpos($version, 'VERSION'));
         $this->assertEquals($ds::VERSION, $version);
@@ -73,88 +76,88 @@ class DatastoreTest extends Test
     function testHas()
     {
         $ds = $this->getDatastore();
-        $this->assertFalse($ds->hasKey('hello'));
-        $this->assertFalse($ds->hasKey('hello/world'));
+        $this->assertFalse($ds->has('hello'));
+        $this->assertFalse($ds->has('hello/world'));
 
-        $ds->setContents('hello', 'Some Contents');
-        $this->assertTrue($ds->hasKey('hello'));
-        $this->assertFalse($ds->hasKey('hello/world'));
+        $ds->set('hello', 'Some Contents');
+        $this->assertTrue($ds->has('hello'));
+        $this->assertFalse($ds->has('hello/world'));
     }
 
     function testGet()
     {
         $ds = $this->getDatastore();
 
-        $this->assertTrue($ds->hasKey('hello'));
-        $this->assertEquals('Some Contents', $ds->getContents('hello'));
-
-        $this->assertFalse($ds->hasKey('world'));
-        $this->assertEquals(null, $ds->getContents('world'));
+        $this->assertTrue($ds->has('hello'));
+        $this->assertEquals('Some Contents', $ds->get('hello'));
+        $this->assertFalse($ds->has('world'));
+        $this->assertEquals(null, $ds->get('world'));
     }
 
-    function testSet()
+    /**
+     * throws: TypeError::class
+     */
+    function testSetException()
     {
         $ds = $this->getDatastore();
+        $ds->set('hello', []);
+    }
 
-        $this->assertException(
-            function() use($ds){
-                $ds->setContents('hello', []);
-            },
-            Exception::class,
-            'value must be a string'
-        );
+    function testSet() {
+        $ds = $this->getDatastore();
+        $ds->set('hello', 'Hello World!');
+        $this->assertEquals('Hello World!', $ds->get('hello'));
 
-        $ds->setContents('hello', 'Hello World!');
-        $this->assertEquals('Hello World!', $ds->getContents('hello'));
+        $this->assertTrue($ds->set('hello', 'Something else'));
+        $this->assertEquals('Something else', $ds->get('hello'));
 
-        $this->assertTrue($ds->setContents('hello', 'Something else'));
-        $this->assertEquals('Something else', $ds->getContents('hello'));
-
-        $info = $ds->getInfo('hello');
+        $info = $ds->info('hello');
         $this->assertArray($info);
         $this->assertEquals('5d41402abc4b2a76b9719d911017c592', $info['hash']);
         $this->assertEquals(14, $info['size']);
     }
 
-    function testGetInfo()
+    function testInfo()
     {
         $ds = $this->getDatastore();
 
-        $r = $ds->getInfo('hello-world');
-        $this->assertNull($r);
+        $info = $ds->info('hello-world');
+        $this->assertNull($info);
 
-        $ds->setContents('hello-world', 'Information');
-        $r = $ds->getInfo('hello-world');
-        $this->assertArray($r);
-        $this->assertEquals($ds->hash('hello-world'), $r['hash']);
-        $this->assertEquals($this->samples['hello-world'], $ds->hashToPath($r['hash']));
-        $this->assertEquals(11, $r['size']);
-        $this->assertNotNull($r['created_on']);
-        $this->assertNotNull($r['updated_on']);
+        $ds->set('hello-world', 'Information');
+        $info = $ds->info('hello-world');
+        $this->assertArray($info);
+        $this->assertEquals(md5('hello-world'), $info['hash']);
+        $this->assertEquals($this->samples['hello-world'], $ds->getPath('hello-world'));
+        $this->assertEquals(11, $info['size']);
+        $this->assertNotNull($info['created_on']);
+        $this->assertNotNull($info['updated_on']);
     }
 
     function testRemove()
     {
         $ds = $this->getDatastore();
-        $this->assertTrue($ds->hasKey('hello'));
-        $this->assertTrue($ds->removeContents('hello'));
-        $this->assertFalse($ds->hasKey('hello'));
-        $this->assertNull($ds->getContents('hello'));
-        $this->assertFalse($ds->removeContents('hello'));
 
-        $file = __DIR__ . '/ds' . '/' . '.datastore.sqlite';
-        $db = new Database(['file' => $file]);
-        $r = $db->getFirst(['table' => 'datastoreindex']);
+        $this->assertTrue($ds->has('hello'));
+        $this->assertTrue($ds->remove('hello'));
+        $this->assertFalse($ds->has('hello'));
+        $this->assertNull($ds->get('hello'));
+        $this->assertFalse($ds->remove('hello'));
+
+        $file = __DIR__ . '/ds' . '/' . 'ds.idx';
+        $db = new Database(['type' => 'sqlite', 'file' => $file, 'table' => 'ds']);
+        $r = $db->getFirst('ds');
         $this->assertArray($r);
         $this->assertEquals(md5('hello-world'), $r['hash']);
 
-        $ds->removeContents('hello-world');
-        $r = $db->getFirst(['table' => 'datastoreindex']);
+        $ds->remove('hello-world');
+        $r = $db->getFirst('ds');
         $this->assertNull($r);
     }
 
     public function testAddFile()
     {
+
         $ds = $this->getDatastore();
 
         $key = 'datastore-test-file';
@@ -165,123 +168,18 @@ class DatastoreTest extends Test
         $contents = file_get_contents($file);
 
         $ds->addFile($key, $file, $meta);
-        $info = $ds->getInfo($key);
+        $info = $ds->info($key);
 
         $this->assertEquals($key, $info['key']);
-        $this->assertEquals(date('Y-m-d H:i:s', filectime($file)), $info['created_on']);
-        $this->assertEquals(filemtime($file), $info['updated_on']);
+        $this->assertEquals(time(), $info['created_on']);
+        $this->assertEquals(filectime($file), strtotime($info['meta']['created_on']));
+        $this->assertEquals(filemtime($file), $info['meta']['updated_on']);
 
         $this->assertEquals($file, $info['meta']['file']);
         $this->assertEquals('DatastoreTest.php', $info['meta']['filename']);
         $this->assertEquals('text/x-php', $info['meta']['mime']);
         $this->assertEquals($meta['keywords'], $info['meta']['keywords']);
 
-        $this->assertEquals($contents, $ds->getContents($key));
-    }
-
-    public function testGetComposit()
-    {
-        $ds = $this->getDatastore();
-        $file = __FILE__;
-        $key = 'datastore-test-file';
-
-        $contents = file_get_contents($file);
-        $composit = $ds->getComposit($key);
-        $info = $ds->getInfo($key);
-
-        $this->assertEquals($contents, $composit['contents']);
-
-        foreach ($info as $k=>$v) {
-            if (is_int($k))
-                continue;
-
-            $this->assertEquals($composit[$k], $v);
-        }
-    }
-
-    public function testSetComposit()
-    {
-        $ds = $this->getDatastore();
-        $file = __FILE__;
-        $contents = file_get_contents($file);
-
-        $ds->removeContents($file);
-        $c = [
-            'key' => $file,
-            'contents' => $contents,
-            'meta' => [
-                'hello' => 'world',
-            ],
-            'created_on' => date('Y-m-d H:i:s'),
-            'updated_on' => 1,
-        ];
-
-        $ds->setComposite($c);
-
-        $info = $ds->getInfo($file);
-        $info['contents'] = $ds->getContents($info['key']);
-
-        foreach ($c as $k=>$v) {
-            if (is_int($k))
-                continue;
-
-            $this->assertEquals($c[$k], $info[$k]);
-        }
-    }
-
-    function testSpeed()
-    {
-        $c = $this->console;
-        $ds = $this->getDatastore();
-        $t['start'] = microtime(1);
-
-        for ($i = 0; $i < 100; $i++) {
-            $ds->setComposite(
-                [
-                    'key' => "$i",
-                    'meta' => [
-                        'parity' => $i % 2,
-                    ],
-                    'contents' => "value:$i"
-                ]
-            );
-        }
-
-        $t['write'] = microtime(1);
-
-        $v = [];
-        for ($i = 0; $i < 100; $i++) {
-            $v[$i] = $ds->getComposit("$i");
-        }
-
-        $t['read'] = microtime(1);
-
-        for ($i = 0; $i < 100; $i++) {
-            $this->assertEquals($v[$i]['contents'], "value:$i");
-        }
-
-        $c->write(
-            sprintf(
-                " (writing %2.4f sec, reading %2.4f sec)",
-                ($t['write'] - $t['start']),
-                ($t['read'] - $t['write'])
-            ),
-            "dark"
-        );
-    }
-
-    function testRemoveTheTemporaryDatastore()
-    {
-        $dir  = __DIR__ . '/ds';
-        $file = $dir . '/' . '.datastore.sqlite';
-
-        if (file_exists($file)) {
-            unlink($file);
-        }
-
-        if (is_dir($dir)) {
-            system('rm -r ' . $dir, $result);
-            $this->assertEquals(0, $result);
-        }
+        $this->assertEquals($contents, $ds->get($key));
     }
 }

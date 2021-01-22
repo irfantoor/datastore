@@ -1,91 +1,74 @@
 <?php
 
+/**
+ * IrfanTOOR\Database
+ * php version 7.3
+ *
+ * @author    Irfan TOOR <email@irfantoor.com>
+ * @copyright 2021 Irfan TOOR
+ */
+
 namespace IrfanTOOR;
 
 use Exception;
-use IrfanTOOR\{
-	Datastore\Constants,
-	Database\Model,
-	Filesystem
-};
+use IrfanTOOR\Datastore\Index;
+use IrfanTOOR\Filesystem;
 
-class Datastore extends Model
+class Datastore
 {
-    /**
-     * Version
-     *
-     * @var const
-     */
-    public const VERSION = "0.3.6";
+    const NAME           = "Irfan's Datastore";
+    const DESCRIPTION    = "Data Store of key, value pairs";
+    const VERSION        = "0.4";
 
-    /**
-     * Filesystem Object
-     *
-     * @var Filesystem
-     */
+    /** @var Model */
+    protected $index;
+
+    /** @var Filesystem */
     protected $fs;
 
     /**
      * Constructs the Datastore
      *
-     * @param array
-     */    
-    function __construct($connection = [])
+     * @param string $path Datastore path
+     */
+    public function __construct(string $path)
     {
-        $this->schema = [
-            'id INTEGER PRIMARY KEY',
-            'key VARCHAR(200)',
-            'hash VARCHAR(32)',
-            'meta',
-            'size INTEGER DEFAULT 0',
-            'created_on DATETIME DEFAULT CURRENT_TIMESTAMP',
-            'updated_on INTEGER'
-        ];
+        if (!is_dir($path))
+            throw new Exception("path must be a directory", 1);
 
-        $this->indecies = [
-            ['index' => 'key'],
-            ['unique' => 'hash'],
-            ['index' => 'created_on'],
-        ];
+        $this->fs = new Filesystem($path);
 
-        if (isset($connection['file'])) {
-            if (!isset($connection['path'])) {
-                $connection['path'] = filepath($connection['file']) . '/';
-            }
-        }
-
-        if (isset($connection['path'])) {
-            if (!is_dir($connection['path'])) {
-                throw new Exception("path must be a directory", 1);
-            }
-
-            if (!isset($connection['file'])) {
-                $connection['file'] = rtrim($connection['path'], '/') . '/.datastore.sqlite';
-            }
-        }
-
-        $this->fs = new Filesystem($connection['path']);
-
-        if (!isset($connection['table'])) {
-            $connection['table'] = 'datastoreindex';
-        }
-
-        if (!is_file($connection['file'])) {
-            file_put_contents($connection['file'], '');
-            parent::__construct($connection);
-            $this->create();
-        } else {
-            parent::__construct($connection);
-        }
+        $file = rtrim($path, '/') . '/ds.idx';
+        $this->index = new Index(
+            [
+                'file'  => $file,
+                'table' => 'ds'
+            ]
+        );
     }
 
-    function hash($key)
+    /**
+     * Calculates the hash of a key
+     *
+     * @param string $key
+     * @return string
+     */
+    protected function hash(string $key): string
     {
         return md5($key);
     }
 
-    function hashToPath($h)
+    /**
+     * Caclulates the path from a hash
+     *
+     * @param string $hash
+     * @return string
+     */
+    protected function hashToPath(string $h): string
     {
+        if (!isset($h[5]))
+            throw new Exception("invalid hash");
+
         return
             $h[0] . $h[1] . '/' .
             $h[2] . $h[3] . '/' .
@@ -93,130 +76,151 @@ class Datastore extends Model
             $h;
     }
 
-    function getPath($key)
+    /**
+     * Caclulates and returns the path assciated with a key
+     *
+     * @param string $key
+     */
+    public function getPath(string $key): string
     {
-        $h = $this->hash($key);
-        return $this->hashToPath($h);
+        $hash = $this->hash($key);
+        return $this->hashToPath($hash);
     }
 
-    function hasHash($hash)
+    /**
+     * Verifies if a hash is present
+     */
+    protected function hasHash(string $hash): bool
     {
-        return $this->db->has(
-            ['where' => 'hash=:hash'],
-            ['hash' => $hash]
-        );
+        return $this->index->has(['hash' => $hash]);
     }
 
-    function getVersion()
+    /**
+     * Returns the version of Datastore
+     *
+     * @return string
+     */
+    public function getVersion(): string
     {
         return self::VERSION;
     }
 
-    function hasKey($key)
+    /**
+     * Verifies if a key is present in the store
+     * @param string $key
+     *
+     * @return bool
+     */
+    public function has(string $key): bool
     {
-        return $this->has(
-            ['where' => 'key=:key'],
-            ['key' => $key]
+        return $this->index->has(
+            [
+                'where' => 'key=:key',
+                'bind' => [
+                    'key' => $key
+                ]
+            ]
         );
     }
 
-    function setContents($key, $contents)
+    /**
+     * Sets the value of the key
+     *
+     * @param string $key
+     * @param string $value
+     * @param array  $meta  Meta-tags or keywords related to the value
+     *
+     * @return bool
+     */
+    function set(string $key, string $value, array $meta = []): bool
     {
-        if (!is_string($contents)) {
-            throw new Exception("value must be a string", 1);
-        }
-
-        return $this->setComposite([
-            'key' => $key,
-            'contents' => $contents
-        ]);
-    }
-
-    function setComposite(Array $c) {
-        if (!isset($c['key'])) {
-            throw new Exception("key not provided", 1);
-        }
-
-        if (!isset($c['contents'])) {
-            throw new Exception("contents not provided", 1);
-        }
-
-        $hash = $this->hash($c['key']);
+        $hash = $this->hash($key);
         $path = $this->hashToPath($hash);
         $dir = dirname($path);
 
-        if (!$this->fs->hasDir($dir)) {
-            $this->fs->createDir($dir, true);
-        }
+        $updating = $this->fs->has($path);
 
-        if ($this->fs->write($path, $c['contents'], true)) {
-            $r = [
-                'key' => $c['key'],
+        if (!$updating)
+            $this->fs->createDir($dir, true);
+
+        if ($this->fs->write($path, $value, true)) {
+            $info = [
+                'key' => $key,
                 'hash' => $hash,
-                'meta' => isset($c['meta']) ? json_encode($c['meta']) : '',
-                'size'  => strlen($c['contents']),
-                'updated_on' => isset($c['updated_on']) ? $c['updated_on'] : time(),
+                'meta' => json_encode($meta),
+                'size'  => strlen($value),
+                'updated_on' => time(),
             ];
 
-            if (isset($c['created_on'])) {
-                $r['created_on'] = $c['created_on'];
-            }
+            if (!$updating)
+                $info['created_on'] = $info['updated_on'];
 
-            return $this->insertOrUpdate($r);
+            return $this->index->insertOrUpdate($info);
         }
 
         return false;
     }
 
-    function getInfo($key)
+    /**
+     * Retrieves information regarding an entry
+     *
+     * @param string $key
+     *
+     * @return null|array
+     */
+    function info(string $key)
     {
-        $r = $this->getFirst(
-            ['where' => 'key=:key'],
-            ['key' => $key]
+        $info = $this->index->getFirst(
+            [
+                'where' => 'key=:key',
+                'bind' => [
+                    'key' => $key
+                ]
+            ]
         );
 
-        if (isset($r['meta'])) {
-            $r['meta'] = json_decode($r['meta'], 1);
-        }
+        if ($info)
+            $info['meta'] = json_decode($info['meta'], true);
 
-        return $r ?: null;
+        return $info ?? null;
     }
 
-    function getContents($key)
+    /**
+     * Retrieves the value of key
+     *
+     * @param string $key
+     *
+     * @return null|string
+     */
+    function get(string $key)
     {
-        $r = $this->getInfo($key);
-
-        if ($r) {
-            return $this->fs->read($this->hashToPath($r['hash']));
-        }
-
-        return null;
+        $info = $this->info($key);
+        return $info ? $this->fs->read($this->hashToPath($info['hash'])) : null;
     }
 
-    function getComposit($key)
+    /**
+     * Removes the value associated to the key and its information
+     *
+     * @param string $key
+     */
+    public function remove(string $key)
     {
-        $c = $this->getInfo($key);
+        $info = $this->info($key);
 
-        if ($c) {
-            $c['contents'] = $this->fs->read($this->hashToPath($c['hash']));
-        }
+        if ($info) {
+            $path = $this->hashToPath($info['hash']);
 
-        return $c;
-    }
-
-    function removeContents($key)
-    {
-        $r = $this->getInfo($key);
-
-        if ($r) {
-            $path = $this->hashToPath($r['hash']);
-            $removed = $this->remove(
-                ['where' => 'key = :key'],
-                ['key' => $key]
+            $result = $this->index->remove(
+                [
+                    'where' => 'key = :key',
+                    'bind'  => [
+                        'key' => $key,
+                    ]
+                ],
             );
-            if ($removed) {
-                $this->fs->remove($path);
-                return true;
+
+            if ($result) {
+                return $this->fs->remove($path);
             }
         }
 
@@ -225,30 +229,26 @@ class Datastore extends Model
 
     function addFile($key, $file, $meta = [])
     {
-        if (!is_file($file)) {
+        if (!is_file($file))
             throw new Exception("file: $file, does not exist", 1);
-        }
 
         $path = dirname($file);
         $filename = str_replace($path, '', $file);
         $ds = $filename[0];
         $path = $path . $ds;
         $filename = str_replace($ds, '', $filename);
+
         $meta = array_merge(
             [
-                'file' => $file,
-                'filename' => $filename,
-                'mime'     => mime_content_type($file),
+                'file'       => $file,
+                'filename'   => $filename,
+                'mime'       => mime_content_type($file),
+                'created_on' => date('Y-m-d H:i:s', filectime($file)),
+                'updated_on' => filemtime($file),
             ],
             $meta
         );
 
-        return $this->setComposite([
-            'key' => $key,
-            'meta' => $meta,
-            'created_on' => date('Y-m-d H:i:s', filectime($file)),
-            'updated_on' => filemtime($file),
-            'contents' => file_get_contents($file),
-        ]);
+        return $this->set($key, file_get_contents($file), $meta);
     }
 }

@@ -1,8 +1,8 @@
 {
     "name": "irfantoor/datastore",
     "description": "Data Store of key, value pairs",
-    "keywords": [ 
-	"Data", "key value Storage", "Filesystem"
+    "keywords": [
+        "Data", "key value Storage", "Filesystem"
     ],
     "type": "library",
     "license": "MIT",
@@ -13,16 +13,16 @@
         }
     ],
     "require": {
-	"php": ">= 7.3",
-        "irfantoor/database": "^0.2",
-        "irfantoor/filesystem": "^0.3.0"
+        "php": ">= 7.3",
+        "irfantoor/database": "~0.4",
+        "irfantoor/filesystem": "~0.3"
     },
     "require-dev": {
-        "irfantoor/test": "^0.6.1"
+        "irfantoor/test": "~0.7"
     },
     "autoload": {
-        "classmap": [
-            "src/"
-        ]
+        "psr-4": {
+            "IrfanTOOR\\": "src/"
+        }
     }
 }
