@@ -18,7 +18,7 @@ class Datastore
 {
     const NAME           = "Irfan's Datastore";
     const DESCRIPTION    = "Data Store of key, value pairs";
-    const VERSION        = "0.4";
+    const VERSION        = "0.4.1";
 
     /** @var Model */
     protected $index;

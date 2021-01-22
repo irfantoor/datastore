@@ -48,7 +48,7 @@ $meta = [
 ];
 
 $ds->setComponents('hello', 'Hello World!', $meta);
-
+```
 
 ## info($id)
 
